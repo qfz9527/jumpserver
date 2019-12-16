@@ -4,9 +4,8 @@
 {% load bootstrap3 %}
 
 {% block auth %}
-    <h3>{% trans 'Auth' %}</h3>
-    {% bootstrap_field form.private_key_file layout="horizontal" %}
     {% bootstrap_field form.password layout="horizontal" %}
+    {% bootstrap_field form.private_key layout="horizontal" %}
     <div class="form-group">
         <label for="{{ form.as_push.id_for_label }}" class="col-sm-2 control-label">{% trans 'Auto push' %}</label>
         <div class="col-sm-8">
@@ -15,10 +14,9 @@
     </div>
 {% endblock %}
 
-{% block custom_foot_js %}
-	<script>
-    $(document).ready(function () {
-        $('.select2').select2();
-    })
-	</script>
+{% block formUrl %}
+    var the_url = '{% url 'api-assets:system-user-detail' pk=object.pk %}';
+    var redirect_to = '{% url "assets:system-user-list" %}';
+    var method = "PUT";
 {% endblock %}
+

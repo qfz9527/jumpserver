@@ -7,7 +7,6 @@
 {% load bootstrap3 %}
 <p class="text-success text-center">{% trans "Hint: only change the field you want to update." %}</p>
 <form method="post" class="form-horizontal" action="" id="fm_asset_group_bulk_update">
-
     <div class="form-group">
         <label for="assets" class="col-sm-2 control-label">{% trans 'Assets' %}</label>
         <div class="col-sm-9" id="select2-container">
@@ -32,7 +31,7 @@
     <div class="form-group">
         <div class="col-sm-9 col-lg-9 col-sm-offset-2">
             <div class="checkbox checkbox-success">
-                <input type="checkbox" name="enable_otp" checked id="id_enable_otp"><label for="id_enable_otp">{% trans 'Enable-OTP' %}</label>
+                <input type="checkbox" name="enable_mfa" checked id="id_enable_mfa"><label for="id_enable_mfa">{% trans 'Enable-MFA' %}</label>
             </div>
         </div>
     </div>

@@ -3,9 +3,7 @@
 {% load i18n %}
 
 {% block custom_head_css_js %}
-    <link href="{% static 'css/plugins/select2/select2.min.css' %}" rel="stylesheet">
     <link href="{% static "css/plugins/sweetalert/sweetalert.css" %}" rel="stylesheet">
-    <script src="{% static 'js/plugins/select2/select2.full.min.js' %}"></script>
     <script src="{% static "js/plugins/sweetalert/sweetalert.min.js" %}"></script>
 {% endblock %}
 {% block content %}
@@ -186,6 +184,18 @@
             </div>
         </div>
     </div>
-    {% include 'users/_user_update_pk_modal.html' %}
+{% endblock %}
+{% block custom_foot_js %}
+<script>
+$(document).ready(function () {
+}).on('click', '.celery-task-log', function () {
+    var history_pk = "{{ object.latest_history.pk  }}";
+    if (!history_pk) {
+        alert("没有运行历史");
+        return
+    }
+    showCeleryTaskLog(history_pk);
+})
+</script>
 {% endblock %}
 

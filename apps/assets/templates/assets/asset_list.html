@@ -1,161 +1,201 @@
-{% extends '_base_list.html' %}
-{% load i18n %}
+{% extends '_base_asset_tree_list.html' %}
 {% load static %}
-{% block custom_head_css_js %}
-<link href="{% static 'css/plugins/select2/select2.min.css' %}" rel="stylesheet">
-<script src="{% static 'js/plugins/select2/select2.full.min.js' %}"></script>
+{% load i18n %}
 
-{% endblock %}
-{% block content_left_head %}{% endblock %}
-
-{% block table_search %}
-    <div class="html5buttons">
-        <div class="dt-buttons btn-group">
-            <a class="btn btn-default btn_import" data-toggle="modal" data-target="#asset_import_modal" tabindex="0">
-                <span>{% trans "Import" %}</span>
-            </a>
-            <a class="btn btn-default btn_export" tabindex="0">
-                <span>{% trans "Export" %}</span>
-            </a>
-        </div>
-    </div>
+{% block help_message %}
+    {% trans 'The left side is the asset tree, right click to create, delete, and change the tree node, authorization asset is also organized as a node, and the right side is the asset under that node' %}
 {% endblock %}
 
 {% block table_container %}
-<div class="uc pull-left m-r-5"><a href="{% url "assets:asset-create" %}" class="btn btn-sm btn-primary"> {% trans "Create asset" %} </a></div>
-<table class="table table-striped table-bordered table-hover " id="asset_list_table" >
-    <thead>
-        <tr>
-            <th class="text-center"><input type="checkbox" class="ipt_check_all"></th>
-            <th class="text-center">{% trans 'Hostname' %}</th>
-            <th class="text-center">{% trans 'IP' %}</th>
-            <th class="text-center">{% trans 'Port' %}</th>
-            <th class="text-center">{% trans 'Cluster' %}</th>
-            <th class="text-center">{% trans 'Hardware' %}</th>
-            <th class="text-center">{% trans 'Active' %}</th>
-            <th class="text-center">{% trans 'Reachable' %}</th>
-            <th class="text-center">{% trans 'Action' %}</th>
-        </tr>
-    </thead>
-    <tbody>
-    </tbody>
-</table>
-<div id="actions" class="hide">
-    <div class="input-group">
-        <select class="form-control m-b" style="width: auto" id="slct_bulk_update">
-            <option value="delete">{% trans 'Delete selected' %}</option>
-            <option value="update">{% trans 'Update selected' %}</option>
-            <option value="deactive">{% trans 'Deactive selected' %}</option>
-            <option value="active">{% trans 'Active selected' %}</option>
-        </select>
-        <div class="input-group-btn pull-left" style="padding-left: 5px;">
-            <button id='btn_bulk_update' style="height: 32px;"  class="btn btn-sm btn-primary">
-             {% trans 'Submit' %}
-            </button>
-        </div>
-    </div>
-</div>
-{% include 'assets/_asset_import_modal.html' %}
-{#{% include 'assets/_asset_bulk_update_modal.html' %}#}
+   <div class="uc pull-left m-r-5"><a class="btn btn-sm btn-primary btn-create-asset"> {% trans "Create asset" %} </a></div>
+   {% include '_csv_import_export.html' %}
+   <div class="btn-group" style="float: right">
+      <button data-toggle="dropdown" class="btn btn-default btn-sm dropdown-toggle">{% trans 'Label' %} <span class="caret"></span></button>
+      <ul class="dropdown-menu labels">
+          {% for label in labels %}
+              <li><a style="font-weight: bolder">{{ label.name }}#{{ label.value }}</a></li>
+          {% endfor %}
+      </ul>
+   </div>
+   <table class="table table-striped table-bordered table-hover " id="asset_list_table" style="width: 100%">
+       <thead>
+           <tr>
+               <th class="text-center"><input type="checkbox" class="ipt_check_all"></th>
+               <th class="text-center">{% trans 'Hostname' %}</th>
+               <th class="text-center">{% trans 'IP' %}</th>
+               <th class="text-center">{% trans 'Hardware' %}</th>
+               <th class="text-center">{% trans 'Reachable' %}</th>
+               <th class="text-center">{% trans 'Action' %}</th>
+           </tr>
+       </thead>
+       <tbody>
+       </tbody>
+   </table>
+   <div id="actions" class="hide">
+       <div class="input-group">
+           <select class="form-control m-b" style="width: auto" id="slct_bulk_update">
+               <option value="delete">{% trans 'Delete selected' %}</option>
+               <option value="update">{% trans 'Update selected' %}</option>
+               <option value="remove">{% trans 'Remove from this node' %}</option>
+               <option value="deactive">{% trans 'Deactive selected' %}</option>
+               <option value="active">{% trans 'Active selected' %}</option>
+           </select>
+           <div class="input-group-btn pull-left" style="padding-left: 5px;">
+               <button id='btn_bulk_update' style="height: 32px;"  class="btn btn-sm btn-primary">
+                {% trans 'Submit' %}
+               </button>
+           </div>
+       </div>
+   </div>
+{% include 'assets/_asset_list_modal.html' %}
+{% include 'assets/_node_detail_modal.html' %}
 {% endblock %}
 
 {% block custom_foot_js %}
-<script src="{% static 'js/jquery.form.min.js' %}"></script>
-<script type="text/javascript">
+<script>
+var asset_table, show = 0;
+var update_node_action = "";
+var current_node_id = null;
+var testDatetime = "{% trans 'Test datetime: ' %}";
 
 function initTable() {
     var options = {
         ele: $('#asset_list_table'),
         columnDefs: [
             {targets: 1, createdCell: function (td, cellData, rowData) {
+                cellData = htmlEscape(cellData);
                 {% url 'assets:asset-detail' pk=DEFAULT_PK as the_url  %}
                 var detail_btn = '<a href="{{ the_url }}">' + cellData + '</a>';
                 $(td).html(detail_btn.replace('{{ DEFAULT_PK }}', rowData.id));
             }},
-            {targets: 4, createdCell: function (td, cellData, rowData) {
-                 $(td).html(rowData.cluster_name)
-            }},
-            {targets: 5, createdCell: function (td, cellData, rowData) {
+            {targets: 3, createdCell: function (td, cellData, rowData) {
                 $(td).html(rowData.hardware_info)
             }},
-            {targets: 6, createdCell: function (td, cellData) {
-                if (!cellData) {
-                    $(td).html('<i class="fa fa-times text-danger"></i>')
-                } else {
-                    $(td).html('<i class="fa fa-check text-navy"></i>')
-                }
+            {targets: 4, createdCell: function (td, cellData, rowData) {
+                  var innerHtml = "";
+                  if (cellData.status === 1) {
+                      innerHtml = '<i class="fa fa-circle text-navy"></i>'
+                  } else if (cellData.status === 0) {
+                      innerHtml = '<i class="fa fa-circle text-danger"></i>'
+                  } else {
+                      innerHtml = '<i class="fa fa-circle text-warning"></i>'
+                  }
+                  var dateManual = toSafeLocalDateStr(cellData.datetime);
+                  var dataContent = testDatetime + dateManual;
+                  innerHtml = "<a data-toggle='popover' data-content='" + dataContent + "'" + 'data-placement="auto bottom"' + ">" + innerHtml + "</a>";
+                  $(td).html(innerHtml);
             }},
-            {targets: 7, createdCell: function (td, cellData) {
-                if (cellData == 'Unknown'){
-                    $(td).html('<i class="fa fa-circle text-warning"></i>')
-                } else if (!cellData) {
-                    $(td).html('<i class="fa fa-circle text-danger"></i>')
-                } else {
-                    $(td).html('<i class="fa fa-circle text-navy"></i>')
-                }
-            }},
-            {targets: 8, createdCell: function (td, cellData, rowData) {
+            {targets: 5, createdCell: function (td, cellData, rowData) {
                 var update_btn = '<a href="{% url "assets:asset-update" pk=DEFAULT_PK %}" class="btn btn-xs btn-info">{% trans "Update" %}</a>'.replace("{{ DEFAULT_PK }}", cellData);
-                var del_btn = '<a class="btn btn-xs btn-danger m-l-xs btn_asset_delete" data-uid="{{ DEFAULT_PK }}">{% trans "Delete" %}</a>'.replace('{{ DEFAULT_PK }}', cellData);
+                var del_btn = '<a class="btn btn-xs btn-danger m-l-xs btn-asset-delete" data-uid="{{ DEFAULT_PK }}">{% trans "Delete" %}</a>'.replace('{{ DEFAULT_PK }}', cellData);
                 $(td).html(update_btn + del_btn)
             }}
         ],
         ajax_url: '{% url "api-assets:asset-list" %}',
         columns: [
-            {data: "id"}, {data: "hostname" }, {data: "ip" }, {data: "port" },
-            {data: "cluster"},
-            {data: "cpu_cores"}, {data: "is_active", orderable: false },
-            {data: "is_connective", orderable: false}, {data: "id", orderable: false }
+            {data: "id"}, {data: "hostname"}, {data: "ip"},
+            {data: "cpu_cores", orderable: false},
+            {
+                data: "connectivity",
+                orderable: false,
+                width: '60px'
+            }, {data: "id", orderable: false, width: "100px"}
         ],
         op_html: $('#actions').html()
     };
-    return jumpserver.initServerSideDataTable(options);
+    asset_table = jumpserver.initServerSideDataTable(options);
+    return asset_table
+}
+function initTree() {
+    initNodeTree({
+        onSelected: onNodeSelected,
+        showMenu: true,
+        otherMenu: `
+            <li class="divider"></li>
+            <li id="menu_asset_add" class="btn-add-asset" data-toggle="modal" data-target="#asset_list_modal" tabindex="0"><a><i class="fa fa-copy"></i> {% trans 'Add assets to node' %}</a></li>
+            <li id="menu_asset_move" class="btn-move-asset" data-toggle="modal" data-target="#asset_list_modal" tabindex="0"><a><i class="fa fa-cut"></i> {% trans 'Move assets to node' %}</a></li>
+            <li class="divider"></li>
+            <li id="menu_refresh_hardware_info" class="btn-refresh-hardware" tabindex="-1"><a><i class="fa fa-refresh"></i> {% trans 'Refresh node hardware info' %}</a></li>
+            <li id="menu_test_connective" class="btn-test-connective" tabindex="-1"><a><i class="fa fa-chain"></i> {% trans 'Test node connective' %}</a></li>
+            <li class="divider"></li>
+            <li id="show_current_asset" class="btn-show-current-asset" style="display: none;" tabindex="-1"><a><i class="fa fa-hand-o-up"></i> {% trans 'Display only current node assets' %}</a></li>
+            <li id="show_all_asset" class="btn-show-all-asset" style="display: none;" tabindex="-1"><a><i class="fa fa-th"></i> {% trans 'Displays all child node assets' %}</a></li>
+            <li class="divider"></li>
+            <li id="menu_node_detail" class="btn-node-detail" tabindex="-1"><a><i class="fa fa-info-circle"></i> {% trans 'Node detail' %}</a></li>
+        `
+    })
+}
+
+function onNodeSelected(event, treeNode) {
+    current_node = treeNode;
+    current_node_id = treeNode.meta.node.id;
+    zTree.expandNode(current_node, true);
+    var url = asset_table.ajax.url();
+    url = setUrlParam(url, "node_id", current_node_id);
+    url = setUrlParam(url, "show_current_asset", getCookie('show_current_asset'));
+    setCookie('node_selected', treeNode.node_id);
+    asset_table.ajax.url(url);
+    asset_table.ajax.reload();
+}
+
+function onAssetModalConfirmAddAssetToNode(table) {
+    var assets_selected = table.selected;
+    if (!current_node_id) {
+        return
+    }
+
+    var data = {'assets': assets_selected};
+    var success = function () {
+        table.selected = [];
+        table.ajax.reload()
+    };
+
+    var url = '';
+    if (update_node_action === "move") {
+        url = "{% url 'api-assets:node-replace-assets' pk=DEFAULT_PK %}".replace("{{ DEFAULT_PK }}", current_node_id);
+    } else {
+        url = "{% url 'api-assets:node-add-assets' pk=DEFAULT_PK %}".replace("{{ DEFAULT_PK }}", current_node_id);
+    }
+
+    requestApi({
+        'url': url,
+        'method': 'PUT',
+        'body': JSON.stringify(data),
+        'success': success
+    })
 }
 
 $(document).ready(function(){
-    initTable();
-})
-.on('click', '.btn_export', function () {
-    var $data_table = $('#asset_list_table').DataTable();
-    var rows = $data_table.rows('.selected').data();
-    var assets = [];
-    $.each(rows, function (index, obj) {
-        assets.push(obj.id)
-    });
-    $.ajax({
-        url: "{% url "assets:asset-export" %}",
-        method: 'POST',
-        data: JSON.stringify({assets_id: assets}),
-        dataType: "json",
-        success: function (data, textStatus) {
-            window.open(data.redirect)
-        },
-        error: function () {
-            toastr.error('Export failed');
-        }
-    })
-})
-.on('click', '#btn_asset_import', function () {
-    var $form = $('#fm_asset_import');
-    $form.find('.help-block').remove();
-    function success (data) {
-        if (data.valid === false) {
-            $('<span />', {class: 'help-block text-danger'}).html(data.msg).insertAfter($('#id_assets'));
-        } else {
-            $('#id_created').html(data.created_info);
-            $('#id_created_detail').html(data.created.join(', '));
-            $('#id_updated').html(data.updated_info);
-            $('#id_updated_detail').html(data.updated.join(', '));
-            $('#id_failed').html(data.failed_info);
-            $('#id_failed_detail').html(data.failed.join(', '));
-            var $data_table = $('#asset_list_table').DataTable();
-            $data_table.ajax.reload();
-        }
-    }
-    $form.ajaxSubmit({success: success});
-})
+    asset_table = initTable();
+    initCsvImportExport(asset_table, "{% trans "Asset" %}");
+    initTree();
 
-.on('click', '.btn_asset_delete', function () {
+    if(getCookie('show_current_asset') === '1'){
+        $('#show_all_asset').css('display', 'inline-block');
+    }
+    else{
+        $('#show_current_asset').css('display', 'inline-block');
+    }
+
+    var modalOption = {
+        onModalConfirm: onAssetModalConfirmAddAssetToNode,
+        onModalTableDone: null
+    };
+    setAssetModalOptions(modalOption);
+})
+.on('click', '.labels li', function () {
+    var val = 'label:' + $(this).text();
+    $("#asset_list_table_filter input").val(val);
+    asset_table.search(val).draw();
+ })
+.on('click', '.btn-create-asset', function () {
+    var url = "{% url 'assets:asset-create' %}";
+    if (current_node_id) {
+        url += "?node_id=" + current_node_id;
+    }
+    window.open(url, '_self');
+})
+.on('click', '.btn-asset-delete', function () {
     var $this = $(this);
     var $data_table = $("#asset_list_table").DataTable();
     var name = $(this).closest("tr").find(":nth-child(2)").children('a').html();
@@ -168,15 +208,18 @@ $(document).ready(function(){
 })
 .on('click', '#btn_bulk_update', function () {
     var action = $('#slct_bulk_update').val();
-    var $data_table = $('#asset_list_table').DataTable();
-    var id_list = [];
-    $data_table.rows({selected: true}).every(function(){
-        id_list.push(this.data().id);
-    });
+    var id_list = asset_table.selected;
     if (id_list.length === 0) {
         return false;
     }
     var the_url = "{% url 'api-assets:asset-list' %}";
+    var data = {
+        'resources': id_list
+    };
+
+    function reloadTable() {
+        asset_table.ajax.reload();
+    }
 
     function doDeactive() {
         var data = [];
@@ -184,14 +227,11 @@ $(document).ready(function(){
             var obj = {"pk": object_id, "is_active": false};
             data.push(obj);
         });
-        function success() {
-            location.reload()
-        }
-        APIUpdateAttr({
+        requestApi({
             url: the_url,
             method: 'PATCH',
             body: JSON.stringify(data),
-            success: success
+            success: reloadTable
         });
     }
     function doActive() {
@@ -200,14 +240,11 @@ $(document).ready(function(){
             var obj = {"pk": object_id, "is_active": true};
             data.push(obj);
         });
-        function success() {
-            location.reload();
-        }
-        APIUpdateAttr({
+        requestApi({
             url: the_url,
             method: 'PATCH',
             body: JSON.stringify(data),
-            success: success
+            success: reloadTable
         });
     }
     function doDelete() {
@@ -216,35 +253,75 @@ $(document).ready(function(){
             text: "{% trans 'This will delete the selected assets !!!' %}",
             type: "warning",
             showCancelButton: true,
+            cancelButtonText: "{% trans 'Cancel' %}",
             confirmButtonColor: "#DD6B55",
             confirmButtonText: "{% trans 'Confirm' %}",
             closeOnConfirm: false
-        }, function() {
-            var success = function() {
-                var msg = "{% trans 'Asset Deleted.' %}";
-                swal("{% trans 'Asset Delete' %}", msg, "success");
-                $('#asset_list_table').DataTable().ajax.reload();
-            };
-            var fail = function() {
+        },function () {
+            function success(data) {
+                url = setUrlParam(the_url, 'spm', data.spm);
+                requestApi({
+                    url: url,
+                    method: 'DELETE',
+                    success: function () {
+                        var msg = "{% trans 'Asset Deleted.' %}";
+                        swal("{% trans 'Asset Delete' %}", msg, "success");
+                        reloadTable();
+                    },
+                    flash_message: false,
+                });
+            }
+            function fail() {
                 var msg = "{% trans 'Asset Deleting failed.' %}";
                 swal("{% trans 'Asset Delete' %}", msg, "error");
-            };
-            var url_delete = the_url + '?id__in=' + JSON.stringify(id_list);
-            APIUpdateAttr({
-                url: url_delete,
-                method: 'DELETE',
+            }
+            requestApi({
+                url: "{% url 'api-common:resources-cache' %}",
+                method: 'POST',
+                body: JSON.stringify(data),
                 success: success,
-                error: fail
-            });
-            $data_table.ajax.reload();
-            jumpserver.checked = false;
-        });
+                error: fail,
+                flash_message: false
+             })
+        })
     }
+
     function doUpdate() {
-        var id_list_string = id_list.join(',');
-        var url = "{% url 'assets:asset-bulk-update' %}?assets_id=" + id_list_string;
-        location.href = url
+        function fail(data) {
+            toastr.error(JSON.parse(data))
+        }
+        function success(data) {
+            var url = "{% url 'assets:asset-bulk-update' %}";
+            location.href= setUrlParam(url, 'spm', data.spm);
+         }
+        requestApi({
+            url: "{% url 'api-common:resources-cache' %}",
+            method:'POST',
+            body:JSON.stringify(data),
+            flash_message:false,
+            success:success,
+            error:fail
+        })
+     }
+
+    function doRemove() {
+       if (!current_node_id) {
+           return
+       }
+
+       var data = {
+           'assets': id_list
+       };
+
+       var url = "{% url 'api-assets:node-remove-assets' pk=DEFAULT_PK %}".replace("{{ DEFAULT_PK }}", current_node_id);
+       requestApi({
+           'url': url,
+           'method': 'PUT',
+           'body': JSON.stringify(data),
+           'success': reloadTable
+       })
     }
+
     switch(action) {
         case 'deactive':
             doDeactive();
@@ -258,10 +335,78 @@ $(document).ready(function(){
         case 'active':
             doActive();
             break;
+        case 'remove':
+            doRemove();
+            break;
         default:
             break;
     }
-});
+    $(".ipt_check_all").prop("checked", false)
+})
+.on('hidden.bs.modal', '#asset_list_modal', function () {
+    window.location.reload();
+}).on('click', '#menu_asset_add', function () {
+    update_node_action = "add"
+}).on('click', '#menu_asset_move', function () {
+    update_node_action = "move"
+}).on('click', '.btn-test-connective', function () {
+    var url = "{% url 'api-assets:node-test-connective' pk=DEFAULT_PK %}";
+    if (!current_node_id) {
+        return null;
+    }
+    var the_url = url.replace("{{ DEFAULT_PK }}", current_node_id);
+    function success(data) {
+        rMenu.css({"visibility" : "hidden"});
+        var task_id = data.task;
+        showCeleryTaskLog(task_id);
+    }
+    requestApi({
+        url: the_url,
+        method: "GET",
+        success: success,
+        flash_message: false
+    });
+}).on('click', '.btn-refresh-hardware', function () {
+    var url = "{% url 'api-assets:node-refresh-hardware-info' pk=DEFAULT_PK %}";
+    var the_url = url.replace("{{ DEFAULT_PK }}", current_node_id);
+    function success(data) {
+        rMenu.css({"visibility" : "hidden"});
+        var task_id = data.task;
+        showCeleryTaskLog(task_id);
+    }
+    requestApi({
+        url: the_url,
+        method: "GET",
+        success: success,
+        flash_message: false
+    });
+
+}).on('click', '#menu_node_detail', function(e) {
+    e.preventDefault();
+    var the_url = "{% url 'api-assets:node-detail' pk=DEFAULT_PK %}";
+    the_url = the_url.replace("{{ DEFAULT_PK }}", current_node_id);
+    function drawingNodeDetailModal(data){
+        $('#id_node_detail_id_view').html(data['id']);
+        $('#id_node_detail_name_view').html(data['name']);
+        $('#id_node_detail_full_name_view').html(data['full_value']);
+        $('#id_node_detail_key_view').html(data['key']);
+        $('#node_detail_modal').modal();
+    }
+    function error(data) {
+        alert(data)
+    }
+    function success(data) {
+        drawingNodeDetailModal(data)
+    }
+    requestApi({
+        url: the_url,
+        error: error,
+        method: 'GET',
+        success: success,
+        flash_message: false
+    });
+})
 
 </script>
+
 {% endblock %}

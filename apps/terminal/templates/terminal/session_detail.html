@@ -54,8 +54,12 @@
                                         {% for command in object_list %}
                                             <tr>
                                                 <td>{{ forloop.counter }}</td>
-                                                <td>{{ command.input }}</td>
-                                                <td><pre style="border: none;background: none">{{ command.output }}</pre></td>
+                                                <td>{{ command.input | truncatechars:40 }}</td>
+                                                <td><pre style="border: none;background: none">
+$ {{ command.input }}
+
+{{ command.output }}
+                                                </pre></td>
                                                 <td>{{ command.timestamp|ts_to_date}}</td>
                                             </tr>
                                         {% empty %}
@@ -88,7 +92,7 @@
                                             <td>{% trans 'Replay session' %}:</td>
                                             <td>
                                                 <span class="pull-right">
-                                                    <button type="button" onclick="window.open('/luna/replay/{{ object.id }}','luna', 'height=600, width=800, top=0, left=0, toolbar=no, menubar=no, scrollbars=no, location=no, status=no')" class="btn btn-primary btn-xs" id="btn_reset_password" style="width: 54px">{% trans 'Go' %}</button>
+                                                    <button type="button" onclick="window.open('/luna/replay/{{ object.id }}','luna', 'height=600, width=800, top=400, left=400, toolbar=no, menubar=no, scrollbars=no, location=no, status=no')" class="btn btn-primary btn-xs" id="btn_reset_password" style="width: 54px">{% trans 'Go' %}</button>
                                                 </span>
                                             </td>
                                         </tr>
@@ -132,7 +136,7 @@
                 }, 300)
             }
             var the_url = "{% url 'api-terminal:tasks-list' %}";
-            APIUpdateAttr({url: the_url, method: 'POST', body: JSON.stringify(data), success: success, success_message: 'Terminate success'});
+            requestApi({url: the_url, method: 'POST', body: JSON.stringify(data), success: success, success_message: 'Terminate success'});
         }
         $(document).ready(function () {
             $('.footable').footable();

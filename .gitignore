@@ -5,6 +5,7 @@
 .env
 env
 env*
+venv
 dist
 build
 *.egg
@@ -16,7 +17,7 @@ dump.rdb
 .idea/
 db.sqlite3
 config.py
-migrations/
+config.yml
 *.log
 host_rsa_key
 *.bat
@@ -29,4 +30,9 @@ media
 celerybeat.pid
 django.db
 celerybeat-schedule.db
-static
+data/static
+docs/_build/
+xpack
+logs/*
+### Vagrant ###
+.vagrant/

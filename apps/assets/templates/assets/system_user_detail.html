@@ -2,11 +2,6 @@
 {% load static %}
 {% load i18n %}
 
-{% block custom_head_css_js %}
-    <link href='{% static "css/plugins/select2/select2.min.css" %}' rel="stylesheet">
-    <script src='{% static "js/plugins/select2/select2.full.min.js" %}'></script>
-{% endblock %}
-
 {% block content %}
     <div class="wrapper wrapper-content animated fadeInRight">
         <div class="row">
@@ -19,7 +14,7 @@
                             </li>
                             <li>
                                 <a href="{% url 'assets:system-user-asset' pk=system_user.id %}" class="text-center">
-                                <i class="fa fa-bar-chart-o"></i> {% trans 'Attached assets' %}
+                                <i class="fa fa-bar-chart-o"></i> {% trans 'Assets' %}
                                 </a>
                             </li>
                             <li class="pull-right">
@@ -63,15 +58,19 @@
                                             <td><b>{{ system_user.username }}</b></td>
                                         </tr>
                                         <tr>
-                                            <td>{% trans 'Protocol' %}:</td>
-                                            <td><b>{{ system_user.protocol }}</b></td>
+                                            <td>{% trans 'Login mode' %}:</td>
+                                            <td><b>{{ system_user.get_login_mode_display }}</b></td>
                                         </tr>
                                         <tr>
+                                            <td>{% trans 'Protocol' %}:</td>
+                                            <td><b id="id_protocol_type">{{ system_user.protocol }}</b></td>
+                                        </tr>
+                                        <tr class="only-ssh">
                                             <td>{% trans 'Sudo' %}:</td>
                                             <td><b>{{ system_user.sudo }}</b></td>
                                         </tr>
                                         {% if system_user.shell %}
-                                        <tr>
+                                        <tr class="only-ssh">
                                             <td>{% trans 'Shell' %}:</td>
                                             <td><b>{{ system_user.shell }}</b></td>
                                         </tr>
@@ -107,14 +106,14 @@
                         </div>
 
                         <div class="col-sm-4" style="padding-left: 0;padding-right: 0">
-                            <div class="panel panel-primary">
+                            <div class="panel panel-primary ">
                                 <div class="panel-heading">
                                     <i class="fa fa-info-circle"></i> {% trans 'Quick update' %}
                                 </div>
                                 <div class="panel-body">
                                     <table class="table">
                                         <tbody>
-                                        <tr class="no-borders-tr">
+                                        <tr class="only-ssh-rdp">
                                             <td width="50%">{% trans 'Auto push' %}:</td>
                                             <td>
                                                 <span class="pull-right">
@@ -130,56 +129,69 @@
                                                 </span>
                                             </td>
                                         </tr>
-{#                                        <tr>#}
-{#                                            <td width="50%">{% trans 'Change auth period' %}:</td>#}
-{#                                            <td>#}
-{#                                                <span style="float: right">#}
-{#                                                    <button type="button" class="btn btn-primary btn-xs" style="width: 54px">{% trans 'Reset' %}</button>#}
-{#                                                </span>#}
-{#                                            </td>#}
-{#                                        </tr>#}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                            <div class="panel panel-info">
-                                <div class="panel-heading">
-                                    <i class="fa fa-info-circle"></i> {% trans 'Clusters' %}
-                                </div>
-                                <div class="panel-body">
-                                    <table class="table cluster_edit" id="add-asset2group">
-                                        <tbody>
-                                        <form>
-                                            <tr>
-                                                <td colspan="2" class="no-borders">
-                                                    <select data-placeholder="{% trans 'Add to cluster' %}" id="cluster_selected" class="select2" style="width: 100%" multiple="" tabindex="4">
-                                                        {% for cluster in cluster_remain %}
-                                                        <option value="{{ cluster.id }}" id="opt_{{ cluster.id }}" >{{ cluster.name }}</option>
-                                                        {% endfor %}
-                                                    </select>
-                                                </td>
-                                            </tr>
-                                            <tr>
-                                                <td colspan="2" class="no-borders">
-                                                    <button type="button" class="btn btn-info btn-sm" id="btn-add-to-cluster">{% trans 'Confirm' %}</button>
-                                                </td>
-                                            </tr>
-                                        </form>
-
-                                        {% for cluster in system_user.cluster.all %}
-                                        <tr>
-                                          <td ><b class="bdg_cluster" data-gid={{ cluster.id }}>{{ cluster.name }}</b></td>
-                                          <td>
-                                              <button class="btn btn-danger pull-right btn-xs btn-remove-from-cluster" type="button"><i class="fa fa-minus"></i></button>
-                                          </td>
+                                        {% if system_user.auto_push %}
+                                        <tr class="only-ssh-rdp">
+                                            <td width="50%">{% trans 'Push system user now' %}:</td>
+                                            <td>
+                                                <span style="float: right">
+                                                    <button type="button" class="btn btn-primary btn-xs btn-push" style="width: 54px">{% trans 'Push' %}</button>
+                                                </span>
+                                            </td>
                                         </tr>
-                                        {% endfor %}
+                                        {% endif %}
+                                        <tr>
+                                            <td width="50%">{% trans 'Test assets connective' %}:</td>
+                                            <td>
+                                                <span style="float: right">
+                                                    <button type="button" class="btn btn-primary btn-xs btn-test-connective" style="width: 54px">{% trans 'Test' %}</button>
+                                                </span>
+                                            </td>
+                                        </tr>
                                         </tbody>
                                     </table>
                                 </div>
                             </div>
                         </div>
                     </div>
+                    {% if system_user.protocol != 'rdp' %}
+                    <div class="col-sm-4" style="padding-left: 0; padding-right: 0">
+                        <div class="panel panel-info">
+                            <div class="panel-heading">
+                                <i class="fa fa-info-circle"></i> {% trans 'Command filter' %}
+                            </div>
+                            <div class="panel-body">
+                                <table class="table">
+                                <tbody>
+                                <form>
+                                    <tr>
+                                        <td colspan="2" class="no-borders">
+                                            <select data-placeholder="{% trans 'Binding command filters' %}"  id="command_filters_selected"  class="select2" style="width: 100%" multiple="" tabindex="4">
+                                            {% for cf in cmd_filters_remain %}
+                                                <option value="{{ cf.id }}" id="opt_{{ cf.id }}" >{{ cf }}</option>
+                                            {% endfor %}
+                                            </select>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td colspan="2" class="no-borders">
+                                            <button type="button" class="btn btn-info btn-sm" id="btn-binding-command-filters">{% trans 'Confirm' %}</button>
+                                        </td>
+                                    </tr>
+                                </form>
+                                {% for cf in object.cmd_filters.all %}
+                                <tr>
+                                  <td><b class="bdg-command-filters" data-gid={{ cf.id }}>{{ cf }}</b></td>
+                                  <td>
+                                      <button class="btn btn-danger pull-right btn-xs btn-unbound-command-filter" data-gid={{ cf.id }} type="button"><i class="fa fa-minus"></i></button>
+                                  </td>
+                                </tr>
+                                {% endfor %}
+                                </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -187,45 +199,30 @@
 {% endblock %}
 {% block custom_foot_js %}
 <script>
-function updateSystemUserCluster(clusters) {
+function updateCommandFilters(command_filters) {
     var the_url = "{% url 'api-assets:system-user-detail' pk=system_user.id %}";
     var body = {
-        cluster: Object.assign([], clusters)
+        cmd_filters: Object.assign([], command_filters)
     };
     var success = function(data) {
-        // remove all the selected groups from select > option and rendered ul element;
-        $('.select2-selection__rendered').empty();
-        $('#cluster_selected').val('');
-        $.map(jumpserver.cluster_selected, function(cluster_name, index) {
-            $('#opt_' + index).remove();
-            // change tr html of user groups.
-            $('.cluster_edit tbody').append(
-                '<tr>' +
-                '<td><b class="bdg_cluster" data-gid="' + index + '">' + cluster_name + '</b></td>' +
-                '<td><button class="btn btn-danger btn-xs pull-right btn-remove-from-cluster" type="button"><i class="fa fa-minus"></i></button></td>' +
-                '</tr>'
-            )
-        });
-        // clear jumpserver.groups_selected
-        jumpserver.cluster_selected = {};
+        location.reload();
     };
-    APIUpdateAttr({
+    requestApi({
         url: the_url,
         body: JSON.stringify(body),
         success: success
     });
 }
-jumpserver.cluster_selected = {};
 $(document).ready(function () {
+    var protocol = $('#id_protocol_type').text();
+    if(protocol !== 'ssh'){
+        $('.only-ssh').addClass("hidden")
+    }
+    if(["ssh", "rdp"].indexOf(protocol) === -1){
+        $('.only-ssh-rdp').addClass('hidden');
+    }
+    $(".panel-body .table tr:visible:first").addClass('no-borders-tr');
     $('.select2').select2()
-    .on('select2:select', function(evt) {
-            var data = evt.params.data;
-            jumpserver.cluster_selected[data.id] = data.text;
-    })
-    .on('select2:unselect', function(evt) {
-        var data = evt.params.data;
-        delete jumpserver.cluster_selected[data.id];
-    });
 })
 .on('click', '#btn-auto-push', function () {
     var checked = $(this).prop('checked');
@@ -233,37 +230,10 @@ $(document).ready(function () {
     var body = {
         'auto_push': checked
     };
-    APIUpdateAttr({
+    requestApi({
         url: the_url,
         body: JSON.stringify(body)
     });
-})
-.on('click', '#btn-add-to-cluster', function() {
-    if (Object.keys(jumpserver.cluster_selected).length === 0) {
-        return false;
-    }
-    var clusters = $('.bdg_cluster').map(function() {
-        return $(this).data('gid');
-    }).get();
-    $.map(jumpserver.cluster_selected, function(value, index) {
-        clusters.push(index);
-    });
-    updateSystemUserCluster(clusters);
-})
-.on('click', '.btn-remove-from-cluster', function() {
-    var $this = $(this);
-    var $tr = $this.closest('tr');
-    var $badge = $tr.find('.bdg_cluster');
-    var gid = $badge.data('gid');
-    var cluster_name = $badge.html() || $badge.text();
-    $('#groups_selected').append(
-        '<option value="' + gid + '" id="opt_' + gid + '">' + cluster_name + '</option>'
-    );
-    $tr.remove();
-    var clusters = $('.bdg_cluster').map(function () {
-        return $(this).data('gid');
-    }).get();
-    updateSystemUserCluster(clusters);
 }).on('click', '.btn-del', function () {
     var $this = $(this);
     var name = "{{ system_user.name}}";
@@ -271,6 +241,50 @@ $(document).ready(function () {
     var the_url = '{% url "api-assets:system-user-detail" pk=DEFAULT_PK %}'.replace('{{ DEFAULT_PK }}', uid);
     var redirect_url = "{% url 'assets:system-user-list' %}";
     objectDelete($this, name, the_url, redirect_url);
+})
+.on('click', '.btn-push', function () {
+    var the_url = "{% url 'api-assets:system-user-push' pk=system_user.id %}";
+    var success = function (data) {
+        var task_id = data.task;
+        showCeleryTaskLog(task_id);
+    };
+    requestApi({
+        url: the_url,
+        method: 'GET',
+        success: success,
+        flash_message: false
+    });
+})
+.on('click', '.btn-test-connective', function () {
+    var the_url = "{% url 'api-assets:system-user-connective' pk=system_user.id %}";
+    var success = function (data) {
+        var task_id = data.task;
+        showCeleryTaskLog(task_id);
+    };
+    requestApi({
+        url: the_url,
+        method: 'GET',
+        success: success,
+        flash_message: false
+    });
+}).on('click', '#btn-binding-command-filters', function () {
+    var new_selected_cmd_filters = $.map($('#command_filters_selected').select2('data'), function (i) {
+        return i.id;
+    });
+    var origin_cmd_filters = $.map($(".bdg-command-filters"), function (s) {
+        return $(s).data('gid')
+    });
+    var command_filters = new_selected_cmd_filters.concat(origin_cmd_filters);
+    updateCommandFilters(command_filters)
+}).on('click', '.btn-unbound-command-filter', function () {
+    var unbound_command_filter = $(this).data('gid');
+    var origin_command_filters = $.map($(".bdg-command-filters"), function (s) {
+        return $(s).data('gid')
+    });
+    var command_filters = $.grep(origin_command_filters, function (n, i) {
+        return n !== unbound_command_filter
+    });
+    updateCommandFilters(command_filters)
 })
 </script>
 {% endblock %}

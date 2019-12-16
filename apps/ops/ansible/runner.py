@@ -1,8 +1,11 @@
 # ~*~ coding: utf-8 ~*~
 
 import os
+import shutil
 from collections import namedtuple
 
+from ansible import context
+from ansible.module_utils.common.collections import ImmutableDict
 from ansible.executor.task_queue_manager import TaskQueueManager
 from ansible.vars.manager import VariableManager
 from ansible.parsing.dataloader import DataLoader
@@ -10,13 +13,14 @@ from ansible.executor.playbook_executor import PlaybookExecutor
 from ansible.playbook.play import Play
 import ansible.constants as C
 
-from .callback import AdHocResultCallback, PlaybookResultCallBack, \
-    CommandResultCallback
+from .callback import (
+    AdHocResultCallback, PlaybookResultCallBack, CommandResultCallback
+)
 from common.utils import get_logger
 from .exceptions import AnsibleError
 
 
-__all__ = ["AdHocRunner", "PlayBookRunner"]
+__all__ = ["AdHocRunner", "PlayBookRunner", "CommandRunner"]
 C.HOST_KEY_CHECKING = False
 logger = get_logger(__name__)
 
@@ -32,29 +36,18 @@ Options = namedtuple('Options', [
 
 
 def get_default_options():
-    options = Options(
-        listtags=False,
-        listtasks=False,
-        listhosts=False,
+    options = dict(
         syntax=False,
-        timeout=60,
+        timeout=30,
         connection='ssh',
-        module_path='',
         forks=10,
         remote_user='root',
         private_key_file=None,
-        ssh_common_args="",
-        ssh_extra_args="",
-        sftp_extra_args="",
-        scp_extra_args="",
         become=None,
         become_method=None,
         become_user=None,
-        verbosity=None,
-        extra_vars=[],
+        verbosity=1,
         check=False,
-        playbook_path='/etc/ansible/',
-        passwords=None,
         diff=False,
         gathering='implicit',
         remote_tmp='/tmp/.ansible'
@@ -107,9 +100,9 @@ class PlayBookRunner:
             inventory=self.inventory,
             variable_manager=self.variable_manager,
             loader=self.loader,
-            options=self.options,
-            passwords=self.passwords
+            passwords={"conn_pass": self.passwords}
         )
+        context.CLIARGS = ImmutableDict(self.options)
 
         if executor._tqm:
             executor._tqm._stdout_callback = self.results_callback
@@ -123,19 +116,22 @@ class AdHocRunner:
     ADHoc Runner接口
     """
     results_callback_class = AdHocResultCallback
+    results_callback = None
     loader_class = DataLoader
     variable_manager_class = VariableManager
-    options = get_default_options()
     default_options = get_default_options()
+    command_modules_choices = ('shell', 'raw', 'command', 'script', 'win_shell')
 
     def __init__(self, inventory, options=None):
-        if options:
-            self.options = options
+        self.options = self.update_options(options)
         self.inventory = inventory
         self.loader = DataLoader()
         self.variable_manager = VariableManager(
             loader=self.loader, inventory=self.inventory
         )
+
+    def get_result_callback(self, file_obj=None):
+        return self.__class__.results_callback_class()
 
     @staticmethod
     def check_module_args(module_name, module_args=''):
@@ -153,27 +149,51 @@ class AdHocRunner:
                 "pattern: %s  dose not match any hosts." % pattern
             )
 
+    def clean_args(self, module, args):
+        if not args:
+            return ''
+        if module not in self.command_modules_choices:
+            return args
+        if isinstance(args, str):
+            if args.startswith('executable='):
+                _args = args.split(' ')
+                executable, command = _args[0].split('=')[1], ' '.join(_args[1:])
+                args = {'executable': executable, '_raw_params':  command}
+            else:
+                args = {'_raw_params':  args}
+            return args
+        else:
+            return args
+
     def clean_tasks(self, tasks):
         cleaned_tasks = []
         for task in tasks:
-            self.check_module_args(task['action']['module'], task['action'].get('args'))
+            module = task['action']['module']
+            args = task['action'].get('args')
+            cleaned_args = self.clean_args(module, args)
+            task['action']['args'] = cleaned_args
+            self.check_module_args(module, cleaned_args)
             cleaned_tasks.append(task)
         return cleaned_tasks
 
-    def set_option(self, k, v):
-        kwargs = {k: v}
-        self.options = self.options._replace(**kwargs)
+    def update_options(self, options):
+        _options = {k: v for k, v in self.default_options.items()}
+        if options and isinstance(options, dict):
+            _options.update(options)
+        return _options
 
     def run(self, tasks, pattern, play_name='Ansible Ad-hoc', gather_facts='no'):
         """
         :param tasks: [{'action': {'module': 'shell', 'args': 'ls'}, ...}, ]
         :param pattern: all, *, or others
         :param play_name: The play name
+        :param gather_facts:
         :return:
         """
         self.check_pattern(pattern)
-        results_callback = self.results_callback_class()
+        self.results_callback = self.get_result_callback()
         cleaned_tasks = self.clean_tasks(tasks)
+        context.CLIARGS = ImmutableDict(self.options)
 
         play_source = dict(
             name=play_name,
@@ -192,38 +212,30 @@ class AdHocRunner:
             inventory=self.inventory,
             variable_manager=self.variable_manager,
             loader=self.loader,
-            options=self.options,
-            stdout_callback=results_callback,
-            passwords=self.options.passwords,
+            stdout_callback=self.results_callback,
+            passwords={"conn_pass": self.options.get("password", "")}
         )
-        logger.debug("Get inventory matched hosts: {}".format(
-            self.inventory.get_matched_hosts(pattern)
-        ))
-
         try:
             tqm.run(play)
-            return results_callback
+            return self.results_callback
         except Exception as e:
             raise AnsibleError(e)
         finally:
-            tqm.cleanup()
-            self.loader.cleanup_all_tmp_files()
+            if tqm is not None:
+                tqm.cleanup()
+            shutil.rmtree(C.DEFAULT_LOCAL_TMP, True)
 
 
 class CommandRunner(AdHocRunner):
     results_callback_class = CommandResultCallback
     modules_choices = ('shell', 'raw', 'command', 'script')
 
-    def execute(self, cmd, pattern, module=None):
+    def execute(self, cmd, pattern, module='shell'):
         if module and module not in self.modules_choices:
             raise AnsibleError("Module should in {}".format(self.modules_choices))
-        else:
-            module = "shell"
 
         tasks = [
             {"action": {"module": module, "args": cmd}}
         ]
-        hosts = self.inventory.get_hosts(pattern=pattern)
-        name = "Run command {} on {}".format(cmd, ", ".join([host.name for host in hosts]))
-        return self.run(tasks, pattern, play_name=name)
+        return self.run(tasks, pattern, play_name=cmd)
 
